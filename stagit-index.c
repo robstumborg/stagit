@@ -12,7 +12,7 @@ static git_repository *repo;
 
 static const char *relpath = "";
 
-static char description[255] = "Repositories";
+static char description[255] = "repos - rob stumborg";
 static char *name = "";
 static char owner[255];
 
@@ -96,29 +96,45 @@ void
 writeheader(FILE *fp)
 {
 	fputs("<!DOCTYPE html>\n"
-		"<html>\n<head>\n"
+		"<html lang=\"en\">\n<head>\n"
 		"<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />\n"
 		"<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n"
 		"<title>", fp);
 	xmlencode(fp, description, strlen(description));
-	fprintf(fp, "</title>\n<link rel=\"icon\" type=\"image/png\" href=\"%sfavicon.png\" />\n", relpath);
-	fprintf(fp, "<link rel=\"stylesheet\" type=\"text/css\" href=\"%sstyle.css\" />\n", relpath);
-	fputs("</head>\n<body>\n", fp);
-	fprintf(fp, "<table>\n<tr><td><img src=\"%slogo.png\" alt=\"\" width=\"32\" height=\"32\" /></td>\n"
-	        "<td><span class=\"desc\">", relpath);
-	xmlencode(fp, description, strlen(description));
-	fputs("</span></td></tr><tr><td></td><td>\n"
-		"</td></tr>\n</table>\n<hr/>\n<div id=\"content\">\n"
-		"<table id=\"index\"><thead>\n"
-		"<tr><td><b>Name</b></td><td><b>Description</b></td><td><b>Owner</b></td>"
-		"<td><b>Last commit</b></td></tr>"
+	fprintf(fp, "</title>\n<link rel=\"icon\" type=\"image/svg+xml\" href=\"../%slogo.svg\" />\n", relpath);
+	fprintf(fp, "<link rel=\"alternate icon\" href=\"%sfavicon.ico\" />\n", relpath);
+	fprintf(fp, "<link rel=\"stylesheet\" type=\"text/css\" href=\"%s/css/light.css\" />\n", relpath);
+	fputs("</head>\n<body>"
+	"<div class=\"content\">\n"
+	"<header>\n<div class=\"main\">\n"
+		"<a class=\"title\" href=\"/\">ROB STUMBORG</a>\n"
+	"</div>\n<nav>\n"
+		"<a href=\"/work\">my work</a>\n"
+		"<a href=\"/notes\">notes</a>\n"
+		"<a href=\"/repos\">repos</a>\n"
+	"</nav>\n</header>\n"
+	"<div class=\"hr\"></div>\n"
+	"<div style=\"text-align: center;\">\n"
+	"<h1 class=\"page-title\">repos</h1></div>"
+		"<div class=\"table-container\">\n<table id=\"index\"><thead>\n"
+		"<tr><td><b>name</b></td><td><b>description</b></td><td><b>last commit</b></td></tr>"
 		"</thead><tbody>\n", fp);
 }
 
 void
 writefooter(FILE *fp)
 {
-	fputs("</tbody>\n</table>\n</div>\n</body>\n</html>\n", fp);
+	fputs("</tbody>\n</table>\n</div>\n"
+		"<div class=\"hr\"></div>\n"
+		"<footer>"
+		"<div class=\"connect\">"
+		"<div>"
+		"<strong>let's connect → </strong>"
+		"<a href=\"mailto:rob@stumb.org\">rob@stumb.org</a>"
+		"</div>"
+		"</div>"
+		"</footer>"
+		"</body>\n</html>\n", fp);
 }
 
 int
@@ -149,18 +165,16 @@ writelog(FILE *fp)
 		if (!strcmp(p, ".git"))
 			*p = '\0';
 
-	fputs("<tr><td><a href=\"", fp);
+	fputs("<tr class=\"repo\"><td><a href=\"", fp);
 	percentencode(fp, stripped_name, strlen(stripped_name));
-	fputs("/log.html\">", fp);
+	fputs("/\">", fp);
 	xmlencode(fp, stripped_name, strlen(stripped_name));
 	fputs("</a></td><td>", fp);
 	xmlencode(fp, description, strlen(description));
 	fputs("</td><td>", fp);
-	xmlencode(fp, owner, strlen(owner));
-	fputs("</td><td>", fp);
 	if (author)
 		printtimeshort(fp, &(author->when));
-	fputs("</td></tr>", fp);
+	fputs("</td></tr>\n", fp);
 
 	git_commit_free(commit);
 err:
@@ -176,10 +190,10 @@ main(int argc, char *argv[])
 	FILE *fp;
 	char path[PATH_MAX], repodirabs[PATH_MAX + 1];
 	const char *repodir;
-	int i, ret = 0;
+	int i, ret = 0, tmp;
 
 	if (argc < 2) {
-		fprintf(stderr, "usage: %s [repodir...]\n", argv[0]);
+		fprintf(stderr, "%s [repodir...]\n", argv[0]);
 		return 1;
 	}
 
@@ -199,6 +213,17 @@ main(int argc, char *argv[])
 	writeheader(stdout);
 
 	for (i = 1; i < argc; i++) {
+		if (!strcmp(argv[i], "-c")) {
+			i++;
+			if (i == argc)
+				err(1, "missing argument");
+			repodir = argv[i];
+			fputs("<tr class=\"cat\"><td>", stdout);
+			xmlencode(stdout, repodir, strlen(repodir));
+			fputs("</td><td></td><td></td></tr>\n", stdout);
+			continue;
+		}
+
 		repodir = argv[i];
 		if (!realpath(repodir, repodirabs))
 			err(1, "realpath");
@@ -226,6 +251,9 @@ main(int argc, char *argv[])
 		if (fp) {
 			if (!fgets(description, sizeof(description), fp))
 				description[0] = '\0';
+			tmp = strlen(description);
+			if (tmp > 0 && description[tmp-1] == '\n')
+				description[tmp-1] = '\0';
 			checkfileerror(fp, "description", 'r');
 			fclose(fp);
 		}

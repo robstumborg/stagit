@@ -13,6 +13,7 @@
 #include <unistd.h>
 
 #include <git2.h>
+#include <md4c-html.h>
 
 #include "compat.h"
 
@@ -71,6 +72,8 @@ static char *licensefiles[] = { "HEAD:LICENSE", "HEAD:LICENSE.md", "HEAD:COPYING
 static char *license;
 static char *readmefiles[] = { "HEAD:README", "HEAD:README.md" };
 static char *readme;
+static char *contributefiles[] = { "HEAD:CONTRIBUTING", "HEAD:CONTRIBUTING.md" };
+static char *contribute;
 static long long nlogcommits = -1; /* -1 indicates not used */
 
 /* cache */
@@ -449,6 +452,20 @@ mkdirp(const char *path)
 	return 0;
 }
 
+int
+mkdirfile(const char *path)
+{
+	char *d;
+	char tmp[PATH_MAX];
+	if (strlcpy(tmp, path, sizeof(tmp)) >= sizeof(tmp))
+		errx(1, "path truncated: '%s'", path);
+	if (!(d = dirname(tmp)))
+		err(1, "dirname");
+	if (mkdirp(d))
+		return -1;
+	return 0;
+}
+
 void
 printtimez(FILE *fp, const git_time *intime)
 {
@@ -511,49 +528,71 @@ writeheader(FILE *fp, const char *title)
 	if (description[0])
 		fputs(" - ", fp);
 	xmlencode(fp, description, strlen(description));
-	fprintf(fp, "</title>\n<link rel=\"icon\" type=\"image/png\" href=\"%sfavicon.png\" />\n", relpath);
+	fprintf(fp, " - rob stumborg</title>\n<link rel=\"icon\" type=\"image/svg+xml\" href=\"../%slogo.svg\" />\n", relpath);
+	fprintf(fp, "<link rel=\"alternate icon\" href=\"../%sfavicon.ico\" />\n", relpath);
 	fputs("<link rel=\"alternate\" type=\"application/atom+xml\" title=\"", fp);
 	xmlencode(fp, name, strlen(name));
 	fprintf(fp, " Atom Feed\" href=\"%satom.xml\" />\n", relpath);
 	fputs("<link rel=\"alternate\" type=\"application/atom+xml\" title=\"", fp);
-	xmlencode(fp, name, strlen(name));
 	fprintf(fp, " Atom Feed (tags)\" href=\"%stags.xml\" />\n", relpath);
-	fprintf(fp, "<link rel=\"stylesheet\" type=\"text/css\" href=\"%sstyle.css\" />\n", relpath);
-	fputs("</head>\n<body>\n<table><tr><td>", fp);
-	fprintf(fp, "<a href=\"../%s\"><img src=\"%slogo.png\" alt=\"\" width=\"32\" height=\"32\" /></a>",
-	        relpath, relpath);
-	fputs("</td><td><h1>", fp);
+	fprintf(fp, "<link rel=\"stylesheet\" type=\"text/css\" href=\"/css/light.css\" />\n", relpath);
+	fputs("</head>\n<body>"
+	"<div class=\"content\">\n"
+	"<header>\n<div class=\"main\">\n"
+		"<a class=\"title\" href=\"/\">ROB STUMBORG</a>\n"
+	"</div>\n<nav>\n"
+		"<a href=\"/work\">my work</a>\n"
+		"<a href=\"/notes\">notes</a>\n"
+		"<a href=\"/repos\">repos</a>\n"
+	"</nav>\n</header>\n"
+	"<div class=\"hr\"></div>\n"
+	"<h1 class=\"page-title\">", fp);
 	xmlencode(fp, strippedname, strlen(strippedname));
-	fputs("</h1><span class=\"desc\">", fp);
+	fputs("</h1>", fp);
+	fputs("<div id=\"head\">", fp);
+	fputs("", fp);
+	fputs("<span class=\"desc\">", fp);
 	xmlencode(fp, description, strlen(description));
-	fputs("</span></td></tr>", fp);
+	fputs("</span>\n", fp);
 	if (cloneurl[0]) {
-		fputs("<tr class=\"url\"><td></td><td>git clone <a href=\"", fp);
+		fputs("<p class=\"url\">git clone <a href=\"", fp);
 		xmlencode(fp, cloneurl, strlen(cloneurl)); /* not percent-encoded */
 		fputs("\">", fp);
 		xmlencode(fp, cloneurl, strlen(cloneurl));
-		fputs("</a></td></tr>", fp);
+		fputs("</a></p>\n", fp);
 	}
-	fputs("<tr><td></td><td>\n", fp);
-	fprintf(fp, "<a href=\"%slog.html\">Log</a> | ", relpath);
-	fprintf(fp, "<a href=\"%sfiles.html\">Files</a> | ", relpath);
-	fprintf(fp, "<a href=\"%srefs.html\">Refs</a>", relpath);
-	if (submodules)
-		fprintf(fp, " | <a href=\"%sfile/%s.html\">Submodules</a>",
-		        relpath, submodules);
+	fputs("\n<p>", fp);
 	if (readme)
-		fprintf(fp, " | <a href=\"%sfile/%s.html\">README</a>",
-		        relpath, readme);
+		fprintf(fp, "<a href=\"%sabout.html\">about</a> | ", relpath);
+	fprintf(fp, "<a href=\"%slog.html\">log</a> | ", relpath);
+	fprintf(fp, "<a href=\"%sfiles.html\">files</a> | ", relpath);
+	fprintf(fp, "<a href=\"%srefs.html\">refs</a>", relpath);
+	if (submodules)
+		fprintf(fp, " | <a href=\"%sfile/%s.html\">submodules</a>",
+		        relpath, submodules);
 	if (license)
-		fprintf(fp, " | <a href=\"%sfile/%s.html\">LICENSE</a>",
+		fprintf(fp, " | <a href=\"%sfile/%s.html\">license</a>",
 		        relpath, license);
-	fputs("</td></tr></table>\n<hr/>\n<div id=\"content\">\n", fp);
+	if (contribute)
+		fprintf(fp, " | <a href=\"%sfile/%s.html\">contribute</a>",
+		        relpath, contribute);
+	fputs("</p>\n</div>\n<hr/>\n<div id=\"content\">\n", fp);
 }
 
 void
 writefooter(FILE *fp)
 {
-	fputs("</div>\n</body>\n</html>\n", fp);
+		fputs("<div class=\"hr\"></div>\n"
+		"<footer>"
+		"<div class=\"connect\">"
+		"<div>"
+		"<strong>let's connect → </strong>"
+		"<a href=\"mailto:rob@stumb.org\">rob@stumb.org</a>"
+		"</div>"
+		"</div>"
+		"</footer>"
+		"</div>"
+		"</body>\n</html>\n", fp);
 }
 
 size_t
@@ -600,13 +639,13 @@ printcommit(FILE *fp, struct commitinfo *ci)
 			relpath, ci->parentoid, ci->parentoid);
 
 	if (ci->author) {
-		fputs("<b>Author:</b> ", fp);
+		fputs("<b>author:</b> ", fp);
 		xmlencode(fp, ci->author->name, strlen(ci->author->name));
 		fputs(" &lt;<a href=\"mailto:", fp);
 		xmlencode(fp, ci->author->email, strlen(ci->author->email)); /* not percent-encoded */
 		fputs("\">", fp);
 		xmlencode(fp, ci->author->email, strlen(ci->author->email));
-		fputs("</a>&gt;\n<b>Date:</b>   ", fp);
+		fputs("</a>&gt;\n<b>date:</b>   ", fp);
 		printtime(fp, &(ci->author->when));
 		putc('\n', fp);
 	}
@@ -860,7 +899,7 @@ printcommitatom(FILE *fp, struct commitinfo *ci, const char *tag)
 		fputs("</updated>\n", fp);
 	}
 	if (ci->summary) {
-		fputs("<title>", fp);
+		fputs("<title type=\"text\">", fp);
 		if (tag && tag[0]) {
 			fputs("[", fp);
 			xmlencode(fp, tag, strlen(tag));
@@ -880,7 +919,7 @@ printcommitatom(FILE *fp, struct commitinfo *ci, const char *tag)
 		fputs("</email>\n</author>\n", fp);
 	}
 
-	fputs("<content>", fp);
+	fputs("<content type=\"text\">", fp);
 	fprintf(fp, "commit %s\n", ci->oid);
 	if (ci->parentoid[0])
 		fprintf(fp, "parent %s\n", ci->parentoid);
@@ -889,7 +928,7 @@ printcommitatom(FILE *fp, struct commitinfo *ci, const char *tag)
 		xmlencode(fp, ci->author->name, strlen(ci->author->name));
 		fputs(" &lt;", fp);
 		xmlencode(fp, ci->author->email, strlen(ci->author->email));
-		fputs("&gt;\nDate:   ", fp);
+		fputs("&gt;\ndate:   ", fp);
 		printtime(fp, &(ci->author->when));
 		putc('\n', fp);
 	}
@@ -946,25 +985,48 @@ writeatom(FILE *fp, int all)
 	return 0;
 }
 
-size_t
-writeblob(git_object *obj, const char *fpath, const char *filename, size_t filesize)
+void
+writeblobraw(const git_blob *blob, const char *fpath, const char *filename, git_off_t filesize)
 {
-	char tmp[PATH_MAX] = "", *d;
+	char tmp[PATH_MAX] = "";
 	const char *p;
 	size_t lc = 0;
 	FILE *fp;
 
+	mkdirfile(fpath);
+
 	if (strlcpy(tmp, fpath, sizeof(tmp)) >= sizeof(tmp))
 		errx(1, "path truncated: '%s'", fpath);
-	if (!(d = dirname(tmp)))
-		err(1, "dirname");
-	if (mkdirp(d))
-		return -1;
 
 	for (p = fpath, tmp[0] = '\0'; *p; p++) {
 		if (*p == '/' && strlcat(tmp, "../", sizeof(tmp)) >= sizeof(tmp))
 			errx(1, "path truncated: '../%s'", tmp);
 	}
+
+	fp = efopen(fpath, "w");
+	fwrite(git_blob_rawcontent(blob), (size_t)git_blob_rawsize(blob), 1, fp);
+	fclose(fp);
+}
+
+size_t
+writeblob(git_object *obj, const char *fpath, const char *rpath, const char *filename, size_t filesize)
+{
+	char tmp[PATH_MAX] = "";
+	const char *p, *oldrelpath;
+	int lc = 0;
+	FILE *fp;
+
+	mkdirfile(fpath);
+
+	if (strlcpy(tmp, fpath, sizeof(tmp)) >= sizeof(tmp))
+		errx(1, "path truncated: '%s'", fpath);
+
+	for (p = fpath, tmp[0] = '\0'; *p; p++) {
+		if (*p == '/' && strlcat(tmp, "../", sizeof(tmp)) >= sizeof(tmp))
+			errx(1, "path truncated: '../%s'", tmp);
+	}
+
+	oldrelpath = relpath;
 	relpath = tmp;
 
 	fp = efopen(fpath, "w");
@@ -972,7 +1034,7 @@ writeblob(git_object *obj, const char *fpath, const char *filename, size_t files
 	fputs("<p> ", fp);
 	xmlencode(fp, filename, strlen(filename));
 	fprintf(fp, " (%zuB)", filesize);
-	fputs("</p><hr/>", fp);
+	fprintf(fp, " - <a href=\"%s%s\">raw</a></p><hr/>", relpath, rpath);
 
 	if (git_blob_is_binary((git_blob *)obj))
 		fputs("<p>Binary file.</p>\n", fp);
@@ -983,7 +1045,7 @@ writeblob(git_object *obj, const char *fpath, const char *filename, size_t files
 	checkfileerror(fp, fpath, 'w');
 	fclose(fp);
 
-	relpath = "";
+	relpath = oldrelpath;
 
 	return lc;
 }
@@ -1035,10 +1097,42 @@ writefilestree(FILE *fp, git_tree *tree, const char *path)
 {
 	const git_tree_entry *entry = NULL;
 	git_object *obj = NULL;
-	const char *entryname;
-	char filepath[PATH_MAX], entrypath[PATH_MAX], oid[8];
+	FILE *fp_subtree;
+	const char *entryname, *oldrelpath;
+	char filepath[PATH_MAX], rawpath[PATH_MAX], entrypath[PATH_MAX], tmp[PATH_MAX], tmp2[PATH_MAX], oid[8];
+	char* parent;
 	size_t count, i, lc, filesize;
-	int r, ret;
+	int r, rf, ret, is_obj_tree;
+
+	if (strlen(path) > 0) {
+		fputs("<h2>directory: ", fp);
+		xmlencode(fp, path, strlen(path));
+		fputs("</h2>\n", fp);
+	}
+
+	fputs("<table id=\"files\"><thead>\n<tr>"
+			"<td><b>mode</b></td><td><b>name</b></td>"
+			"<td class=\"num\" align=\"right\"><b>size</b></td>"
+			"</tr>\n</thead><tbody>\n", fp);
+
+	if (strlen(path) > 0) {
+		if (strlcpy(tmp, path, sizeof(tmp)) >= sizeof(tmp))
+			errx(1, "path truncated: '%s'", path);
+		parent = strrchr(tmp, '/');
+		if (parent == NULL)
+			parent = "files";
+		else {
+			*parent = '\0';
+			parent = strrchr(tmp, '/');
+			if (parent == NULL)
+				parent = tmp;
+			else
+				++parent;
+		}
+		fputs("<tr><td>d---------</td><td><a class=\"dir\" href=\"../", fp);
+		xmlencode(fp, parent, strlen(parent));
+		fputs(".html\">..</a></td><td class=\"num\" align=\"right\"></td></tr>\n", fp);
+	}
 
 	count = git_tree_entrycount(tree);
 	for (i = 0; i < count; i++) {
@@ -1051,37 +1145,62 @@ writefilestree(FILE *fp, git_tree *tree, const char *path)
 		         entrypath);
 		if (r < 0 || (size_t)r >= sizeof(filepath))
 			errx(1, "path truncated: 'file/%s.html'", entrypath);
+		rf = snprintf(rawpath, sizeof(rawpath), "raw/%s",
+		         entrypath);
+		if (rf < 0 || (size_t)rf >= sizeof(rawpath))
+			errx(1, "path truncated: 'raw/%s'", entrypath);
 
 		if (!git_tree_entry_to_object(&obj, repo, entry)) {
 			switch (git_object_type(obj)) {
 			case GIT_OBJ_BLOB:
+				is_obj_tree = 0;
+				filesize = git_blob_rawsize((git_blob *)obj);
+				lc = writeblob(obj, filepath, rawpath, entryname, filesize);
+				writeblobraw((git_blob *)obj, rawpath, entryname, filesize);
 				break;
 			case GIT_OBJ_TREE:
+				mkdirfile(filepath);
+
+				if (strlcpy(tmp, relpath, sizeof(tmp)) >= sizeof(tmp))
+					errx(1, "path truncated: '%s'", relpath);
+				if (strlcat(tmp, "../", sizeof(tmp)) >= sizeof(tmp))
+					errx(1, "path truncated: '../%s'", tmp);
+
+				oldrelpath = relpath;
+				relpath = tmp;
+				fp_subtree = efopen(filepath, "w");
+				strlcpy(tmp2, "files - ", sizeof(tmp2));
+				if (strlcat(tmp2, entrypath, sizeof(tmp2)) >= sizeof(tmp2))
+					errx(1, "path truncated: '%s'", tmp2);
+				writeheader(fp_subtree, tmp2);
 				/* NOTE: recurses */
-				ret = writefilestree(fp, (git_tree *)obj,
+				ret = writefilestree(fp_subtree, (git_tree *)obj,
 				                     entrypath);
-				git_object_free(obj);
+				writefooter(fp_subtree);
+				relpath = oldrelpath;
+				lc = 0;
+				is_obj_tree = 1;
 				if (ret)
 					return ret;
-				continue;
+				break;
 			default:
 				git_object_free(obj);
 				continue;
 			}
 
-			filesize = git_blob_rawsize((git_blob *)obj);
-			lc = writeblob(obj, filepath, entryname, filesize);
-
 			fputs("<tr><td>", fp);
 			fputs(filemode(git_tree_entry_filemode(entry)), fp);
-			fprintf(fp, "</td><td><a href=\"%s", relpath);
+			fputs("</td><td><a ", fp);
+			if (git_object_type(obj) == GIT_OBJ_TREE)
+				fputs("class=\"dir\" ", fp);
+			fprintf(fp, "href=\"%s", relpath);
 			percentencode(fp, filepath, strlen(filepath));
 			fputs("\">", fp);
-			xmlencode(fp, entrypath, strlen(entrypath));
+			xmlencode(fp, entryname, strlen(entryname));
 			fputs("</a></td><td class=\"num\" align=\"right\">", fp);
 			if (lc > 0)
 				fprintf(fp, "%zuL", lc);
-			else
+			else if (!is_obj_tree)
 				fprintf(fp, "%zuB", filesize);
 			fputs("</td></tr>\n", fp);
 			git_object_free(obj);
@@ -1097,6 +1216,7 @@ writefilestree(FILE *fp, git_tree *tree, const char *path)
 		}
 	}
 
+	fputs("</tbody></table>", fp);
 	return 0;
 }
 
@@ -1107,16 +1227,9 @@ writefiles(FILE *fp, const git_oid *id)
 	git_commit *commit = NULL;
 	int ret = -1;
 
-	fputs("<table id=\"files\"><thead>\n<tr>"
-	      "<td><b>Mode</b></td><td><b>Name</b></td>"
-	      "<td class=\"num\" align=\"right\"><b>Size</b></td>"
-	      "</tr>\n</thead><tbody>\n", fp);
-
 	if (!git_commit_lookup(&commit, repo, id) &&
 	    !git_commit_tree(&tree, commit))
 		ret = writefilestree(fp, tree, "");
-
-	fputs("</tbody></table>", fp);
 
 	git_commit_free(commit);
 	git_tree_free(tree);
@@ -1130,7 +1243,7 @@ writerefs(FILE *fp)
 	struct referenceinfo *ris = NULL;
 	struct commitinfo *ci;
 	size_t count, i, j, refcount;
-	const char *titles[] = { "Branches", "Tags" };
+	const char *titles[] = { "branches", "tags" };
 	const char *ids[] = { "branches", "tags" };
 	const char *s;
 
@@ -1148,9 +1261,9 @@ writerefs(FILE *fp)
 		/* print header if it has an entry (first). */
 		if (++count == 1) {
 			fprintf(fp, "<h2>%s</h2><table id=\"%s\">"
-		                "<thead>\n<tr><td><b>Name</b></td>"
-			        "<td><b>Last commit date</b></td>"
-			        "<td><b>Author</b></td>\n</tr>\n"
+		                "<thead>\n<tr><td><b>name</b></td>"
+			        "<td><b>last commit date</b></td>"
+			        "<td><b>author</b></td>\n</tr>\n"
 			        "</thead><tbody>\n",
 			         titles[j], ids[j]);
 		}
@@ -1184,9 +1297,15 @@ writerefs(FILE *fp)
 void
 usage(char *argv0)
 {
-	fprintf(stderr, "usage: %s [-c cachefile | -l commits] "
+	fprintf(stderr, "%s [-c cachefile | -l commits] "
 	        "[-u baseurl] repodir\n", argv0);
 	exit(1);
+}
+
+void
+process_output_md(const char* text, unsigned int size, void* fp)
+{
+	fprintf((FILE *)fp, "%.*s", size, text);
 }
 
 int
@@ -1199,7 +1318,7 @@ main(int argc, char *argv[])
 	char path[PATH_MAX], repodirabs[PATH_MAX + 1], *p;
 	char tmppath[64] = "cache.XXXXXXXXXXXX", buf[BUFSIZ];
 	size_t n;
-	int i, fd;
+	int i, fd, r;
 
 	for (i = 1; i < argc; i++) {
 		if (argv[i][0] != '-') {
@@ -1306,6 +1425,14 @@ main(int argc, char *argv[])
 		cloneurl[strcspn(cloneurl, "\n")] = '\0';
 	}
 
+	/* check CONTRIBUTING */
+	for (i = 0; i < sizeof(contributefiles) / sizeof(*contributefiles) && !contribute; i++) {
+		if (!git_revparse_single(&obj, repo, contributefiles[i]) &&
+		    git_object_type(obj) == GIT_OBJ_BLOB)
+			contribute = contributefiles[i] + strlen("HEAD:");
+		git_object_free(obj);
+	}
+
 	/* check LICENSE */
 	for (i = 0; i < LEN(licensefiles) && !license; i++) {
 		if (!git_revparse_single(&obj, repo, licensefiles[i]) &&
@@ -1319,6 +1446,7 @@ main(int argc, char *argv[])
 		if (!git_revparse_single(&obj, repo, readmefiles[i]) &&
 		    git_object_type(obj) == GIT_OBJ_BLOB)
 			readme = readmefiles[i] + strlen("HEAD:");
+			r = i;
 		git_object_free(obj);
 	}
 
@@ -1327,14 +1455,37 @@ main(int argc, char *argv[])
 		submodules = ".gitmodules";
 	git_object_free(obj);
 
+	/* about page */
+	if (readme) {
+		fp = efopen("about.html", "w");
+		writeheader(fp, "about");
+		git_revparse_single(&obj, repo, readmefiles[r]);
+		const char *s = git_blob_rawcontent((git_blob *)obj);
+		if (r == 1) {
+			git_off_t len = git_blob_rawsize((git_blob *)obj);
+			fputs("<div class=\"md\">", fp);
+			if (md_html(s, len, process_output_md, fp, MD_FLAG_TABLES | MD_FLAG_TASKLISTS |
+			    MD_FLAG_PERMISSIVEEMAILAUTOLINKS | MD_FLAG_PERMISSIVEURLAUTOLINKS, 0))
+				err(1, "error parsing markdown");
+			fputs("</div>\n", fp);
+		} else {
+			fputs("<pre id=\"about\">", fp);
+			xmlencode(fp, s, strlen(s));
+			fputs("</pre>\n", fp);
+		}
+		git_object_free(obj);
+		writefooter(fp);
+		fclose(fp);
+	}
+
 	/* log for HEAD */
 	fp = efopen("log.html", "w");
 	relpath = "";
 	mkdir("commit", S_IRWXU | S_IRWXG | S_IRWXO);
-	writeheader(fp, "Log");
-	fputs("<table id=\"log\"><thead>\n<tr><td><b>Date</b></td>"
-	      "<td><b>Commit message</b></td>"
-	      "<td><b>Author</b></td><td class=\"num\" align=\"right\"><b>Files</b></td>"
+	writeheader(fp, "log");
+	fputs("<table id=\"log\"><thead>\n<tr><td><b>date</b></td>"
+	      "<td><b>commit message</b></td>"
+	      "<td><b>author</b></td><td class=\"num\" align=\"right\"><b>files</b></td>"
 	      "<td class=\"num\" align=\"right\"><b>+</b></td>"
 	      "<td class=\"num\" align=\"right\"><b>-</b></td></tr>\n</thead><tbody>\n", fp);
 
@@ -1385,7 +1536,7 @@ main(int argc, char *argv[])
 
 	/* files for HEAD */
 	fp = efopen("files.html", "w");
-	writeheader(fp, "Files");
+	writeheader(fp, "files");
 	if (head)
 		writefiles(fp, head);
 	writefooter(fp);
@@ -1394,7 +1545,7 @@ main(int argc, char *argv[])
 
 	/* summary page with branches and tags */
 	fp = efopen("refs.html", "w");
-	writeheader(fp, "Refs");
+	writeheader(fp, "refs");
 	writerefs(fp);
 	writefooter(fp);
 	checkfileerror(fp, "refs.html", 'w');

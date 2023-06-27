@@ -9,7 +9,7 @@ MANPREFIX = ${PREFIX}/man
 DOCPREFIX = ${PREFIX}/share/doc/${NAME}
 
 LIBGIT_INC = -I/usr/local/include
-LIBGIT_LIB = -L/usr/local/lib -lgit2
+LIBGIT_LIB = -L/usr/local/lib -lgit2 -lmd4c-html
 
 # use system flags.
 STAGIT_CFLAGS = ${LIBGIT_INC} ${CFLAGS}
