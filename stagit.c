@@ -595,37 +595,46 @@ writefooter(FILE *fp)
 		"</body>\n</html>\n", fp);
 }
 
-size_t
-writeblobhtml(FILE *fp, const git_blob *blob)
+int
+syntax_highlight(const char *filename, FILE *fp, const char *s, size_t len)
 {
-	size_t n = 0, i, len, prev;
-	const char *nfmt = "<a href=\"#l%zu\" class=\"line\" id=\"l%zu\">%7zu</a> ";
-	const char *s = git_blob_rawcontent(blob);
+	fflush(fp);
+	int stdout_copy = dup(1);
+	dup2(fileno(fp), 1);
 
-	len = git_blob_rawsize(blob);
-	fputs("<pre id=\"blob\">\n", fp);
-
-	if (len > 0) {
-		for (i = 0, prev = 0; i < len; i++) {
-			if (s[i] != '\n')
-				continue;
-			n++;
-			fprintf(fp, nfmt, n, n, n);
-			xmlencodeline(fp, &s[prev], i - prev + 1);
-			putc('\n', fp);
-			prev = i + 1;
-		}
-		/* trailing data */
-		if ((len - prev) > 0) {
-			n++;
-			fprintf(fp, nfmt, n, n, n);
-			xmlencodeline(fp, &s[prev], len - prev);
-		}
+	FILE *child = popen("stagit-highlight", "w");
+	if (child == NULL) {
+		printf("child is null: %s", strerror(errno));
+		exit(1);
 	}
 
-	fputs("</pre>\n", fp);
+	fprintf(child, "%s\n", filename);
 
-	return n;
+	int lc;
+	size_t i;
+	for (i = 0; *s && i < len; s++, i++) {
+		if (*s == '\n') lc++;
+		fprintf(child, "%c", *s);
+	}
+
+	pclose(child);
+	fflush(stdout);
+	dup2(stdout_copy, 1);
+	return lc;
+}
+
+int
+writeblobhtml(const char *filename, FILE *fp, const git_blob *blob)
+{
+	int lc = 0;
+	const char *s = git_blob_rawcontent(blob);
+	git_off_t len = git_blob_rawsize(blob);
+
+	if (len > 0) {
+		lc = syntax_highlight(filename, fp, s, len);
+	}
+
+	return lc;
 }
 
 void
@@ -1036,13 +1045,14 @@ writeblob(git_object *obj, const char *fpath, const char *rpath, const char *fil
 	fprintf(fp, " (%zuB)", filesize);
 	fprintf(fp, " - <a href=\"%s%s\">raw</a></p><hr/>", relpath, rpath);
 
-	if (git_blob_is_binary((git_blob *)obj))
-		fputs("<p>Binary file.</p>\n", fp);
-	else
-		lc = writeblobhtml(fp, (git_blob *)obj);
-
+	if (git_blob_is_binary((git_blob *)obj)) {
+		fprintf(fp, "<p>binary file - <a href=\"%s%s\">download</a></p>", relpath, rpath);
+	} else {
+		lc = writeblobhtml(filename, fp, (git_blob *)obj);
+		if (ferror(fp))
+			err(1, "fwrite");
+	}
 	writefooter(fp);
-	checkfileerror(fp, fpath, 'w');
 	fclose(fp);
 
 	relpath = oldrelpath;

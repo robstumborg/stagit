@@ -29,7 +29,8 @@ COMPATSRC = \
 	strlcpy.c
 BIN = \
 	stagit\
-	stagit-index
+	stagit-index\
+	stagit-highlight
 MAN1 = \
 	stagit.1\
 	stagit-index.1
@@ -57,8 +58,7 @@ dist:
 	rm -rf ${NAME}-${VERSION}
 	mkdir -p ${NAME}-${VERSION}
 	cp -f ${MAN1} ${HDR} ${SRC} ${COMPATSRC} ${DOC} \
-		Makefile favicon.png logo.png style.css \
-		example_create.sh example_post-receive.sh \
+		Makefile \
 		${NAME}-${VERSION}
 	# make tarball
 	tar -cf - ${NAME}-${VERSION} | \
@@ -73,6 +73,9 @@ stagit: stagit.o ${COMPATOBJ}
 stagit-index: stagit-index.o ${COMPATOBJ}
 	${CC} -o $@ stagit-index.o ${COMPATOBJ} ${STAGIT_LDFLAGS}
 
+stagit-highlight:
+	cp stagit-highlight.py stagit-highlight
+
 clean:
 	rm -f ${BIN} ${OBJ} ${NAME}-${VERSION}.tar.gz
 
@@ -81,15 +84,6 @@ install: all
 	mkdir -p ${DESTDIR}${PREFIX}/bin
 	cp -f ${BIN} ${DESTDIR}${PREFIX}/bin
 	for f in ${BIN}; do chmod 755 ${DESTDIR}${PREFIX}/bin/$$f; done
-	# installing example files.
-	mkdir -p ${DESTDIR}${DOCPREFIX}
-	cp -f style.css\
-		favicon.png\
-		logo.png\
-		example_create.sh\
-		example_post-receive.sh\
-		README\
-		${DESTDIR}${DOCPREFIX}
 	# installing manual pages.
 	mkdir -p ${DESTDIR}${MANPREFIX}/man1
 	cp -f ${MAN1} ${DESTDIR}${MANPREFIX}/man1
