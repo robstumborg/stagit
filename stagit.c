@@ -1042,7 +1042,7 @@ writeblob(git_object *obj, const char *fpath, const char *rpath, const char *fil
 	writeheader(fp, filename);
 	fputs("<p> ", fp);
 	xmlencode(fp, filename, strlen(filename));
-	fprintf(fp, " (%zuB)", filesize);
+	fprintf(fp, " (%juB)", (uintmax_t)filesize);
 	fprintf(fp, " - <a href=\"%s%s\">raw</a></p><hr/>", relpath, rpath);
 
 	if (git_blob_is_binary((git_blob *)obj)) {
@@ -1209,7 +1209,7 @@ writefilestree(FILE *fp, git_tree *tree, const char *path)
 			xmlencode(fp, entryname, strlen(entryname));
 			fputs("</a></td><td class=\"num\" align=\"right\">", fp);
 			if (lc > 0)
-				fprintf(fp, "%zuL", lc);
+				fprintf(fp, "%juB", (uintmax_t)filesize);
 			else if (!is_obj_tree)
 				fprintf(fp, "%zuB", filesize);
 			fputs("</td></tr>\n", fp);
